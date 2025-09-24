@@ -1,0 +1,11 @@
+dist
+coverage
+
+node_modules
+
+pnpm-lock.yaml
+
+*.log
+*.cache
+
+.vscode
