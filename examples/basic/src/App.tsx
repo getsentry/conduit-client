@@ -11,7 +11,7 @@ function App() {
   const { isConnected, error, messages } = useStream<Message>(
     {
       orgId: 1,
-      streamUrl: 'http://localhost:8999/start-stream',
+      startStreamUrl: 'http://localhost:8999/start-stream',
       baseConduitUrl: 'http://localhost:8000',
       onClose: () => {
         setIsEnabled(false);

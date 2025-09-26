@@ -38,7 +38,7 @@ export function useStream<T>(config: ConduitClientConfig<T>, enabled: boolean) {
       clientRef.current = client;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.orgId, config.streamUrl, config.baseConduitUrl]);
+  }, [config.orgId, config.startStreamUrl, config.baseConduitUrl]);
 
   useEffect(() => {
     return () => {

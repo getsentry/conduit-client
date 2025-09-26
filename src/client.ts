@@ -29,7 +29,7 @@ export type ControlEnvelope = BaseEnvelope & {
 
 export type ConduitClientConfig<T> = {
   orgId: number;
-  streamUrl: string;
+  startStreamUrl: string;
   baseConduitUrl: string;
   startStreamData?: Record<string, unknown>;
   onMessage?: (message: T) => void;
@@ -52,12 +52,10 @@ export class ConduitClient<T> {
 
   constructor(config: ConduitClientConfig<T>) {
     this.config = config;
-    this.handleStream = this.handleStream.bind(this);
-    this.handleControl = this.handleControl.bind(this);
   }
 
   private async startStream(): Promise<StartStreamResponse> {
-    const response = await fetch(this.config.streamUrl, {
+    const response = await fetch(this.config.startStreamUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -82,6 +80,57 @@ export class ConduitClient<T> {
     });
     if (this.lastEventId) queryParams.set('last_event_id', this.lastEventId);
     return `${this.config.baseConduitUrl.replace(/\/$/, '')}/events/${this.config.orgId}?${queryParams.toString()}`;
+  }
+
+  private handleStream = (event: MessageEvent): void => {
+    this.lastEventId = event.lastEventId;
+
+    let streamEnvelope: StreamEnvelope<T> | null = null;
+    try {
+      streamEnvelope = JSON.parse(event.data) as StreamEnvelope<T>;
+    } catch {
+      this.config.onError?.(new Error('Failed to parse'));
+      return;
+    }
+
+    // Prioritize end over dedupe and sequence checking
+    if (streamEnvelope.phase === 'PHASE_END') {
+      this.disconnect();
+      return;
+    }
+
+    if (this.seenIds.has(streamEnvelope.message_id)) return;
+    if (this.seenIds.size > MAX_SEEN_TRACKING) this.seenIds.clear();
+    this.seenIds.add(streamEnvelope.message_id);
+
+    if (this.lastSeq !== undefined && streamEnvelope.sequence <= this.lastSeq) return;
+    this.lastSeq = streamEnvelope.sequence;
+
+    const payload = streamEnvelope.payload;
+    if (streamEnvelope.phase === 'PHASE_DELTA' && payload !== undefined) {
+      this.config.onMessage?.(payload);
+    }
+
+    if (streamEnvelope.phase === 'PHASE_ERROR') {
+      this.config.onError?.(new Error('Stream error'));
+    }
+  }
+
+  private handleControl = (event: MessageEvent): void => {
+    this.lastEventId = event.lastEventId;
+
+    let controlEnvelope: ControlEnvelope | null = null;
+    try {
+      controlEnvelope = JSON.parse(event.data) as ControlEnvelope;
+    } catch {
+      this.config.onError?.(new Error('Failed to parse'));
+      return;
+    }
+
+    if (controlEnvelope.control_type === 'server_draining') {
+      this.disconnect();
+      this.reconnect();
+    }
   }
 
   private attach(url: string) {
@@ -110,6 +159,17 @@ export class ConduitClient<T> {
 
     this.eventSource.addEventListener('stream', this.handleStream);
     this.eventSource.addEventListener('control', this.handleControl);
+  }
+
+  private async reconnect(): Promise<void> {
+    if (!this.currentChannelId) {
+      this.connect();
+      return;
+    }
+
+    // TODO: Add token refresh logic when available
+    // For now, fall back to creating a new connection
+    this.connect();
   }
 
   async connect(): Promise<void> {
@@ -151,67 +211,5 @@ export class ConduitClient<T> {
 
   isConnected(): boolean {
     return this.eventSource?.readyState === EventSource.OPEN;
-  }
-
-  private async reconnect(): Promise<void> {
-    if (!this.currentChannelId) {
-      this.connect();
-      return;
-    }
-
-    // TODO: Add token refresh logic when available
-    // For now, fall back to creating a new connection
-    this.connect();
-  }
-
-  private handleStream(event: MessageEvent): void {
-    this.lastEventId = event.lastEventId;
-
-    let streamEnvelope: StreamEnvelope<T> | null = null;
-    try {
-      streamEnvelope = JSON.parse(event.data) as StreamEnvelope<T>;
-    } catch {
-      this.config.onError?.(new Error('Failed to parse'));
-      return;
-    }
-
-    // Prioritize end over dedupe and sequence checking
-    if (streamEnvelope.phase === 'PHASE_END') {
-      this.disconnect();
-      return;
-    }
-
-    if (this.seenIds.has(streamEnvelope.message_id)) return;
-    if (this.seenIds.size > MAX_SEEN_TRACKING) this.seenIds.clear();
-    this.seenIds.add(streamEnvelope.message_id);
-
-    if (this.lastSeq !== undefined && streamEnvelope.sequence <= this.lastSeq) return;
-    this.lastSeq = streamEnvelope.sequence;
-
-    const payload = streamEnvelope.payload;
-    if (streamEnvelope.phase === 'PHASE_DELTA' && payload !== undefined) {
-      this.config.onMessage?.(payload);
-    }
-
-    if (streamEnvelope.phase === 'PHASE_ERROR') {
-      this.config.onError?.(new Error('Stream error'));
-    }
-  }
-
-  private handleControl(event: MessageEvent): void {
-    this.lastEventId = event.lastEventId;
-
-    let controlEnvelope: ControlEnvelope | null = null;
-    try {
-      controlEnvelope = JSON.parse(event.data) as ControlEnvelope;
-    } catch {
-      this.config.onError?.(new Error('Failed to parse'));
-      return;
-    }
-
-    if (controlEnvelope.control_type === 'server_draining') {
-      this.disconnect();
-      this.reconnect();
-    }
   }
 }
