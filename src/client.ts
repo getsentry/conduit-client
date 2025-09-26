@@ -5,10 +5,12 @@ const MAX_SEEN_TRACKING = 2048;
  * authentication and connection details.
  */
 export type StartStreamResponse = {
+  /** Authentication token for the stream connection */
   token: string;
+  /** UUID4 for the stream session */
   channel_id: string;
-  algorithm: string;
-  expires_in: number;
+  /** JWT signing algorithm */
+  algorithm: 'RS256';
 };
 
 type BaseEnvelope = {
@@ -32,9 +34,13 @@ export type StreamPhase = 'PHASE_START' | 'PHASE_DELTA' | 'PHASE_END' | 'PHASE_E
  * @template T The type of payload data
  */
 export type StreamEnvelope<T> = BaseEnvelope & {
+  /** Identifies this as a data stream event */
   event_type: 'stream';
+  /** Sequential message counter for ordering */
   sequence: number;
+  /** Current state of the stream lifecycle */
   phase: StreamPhase;
+  /** Data payload (present for PHASE_DELTA events) */
   payload?: T;
 };
 
@@ -42,7 +48,9 @@ export type StreamEnvelope<T> = BaseEnvelope & {
  * Control message for stream management operations.
  */
 export type ControlEnvelope = BaseEnvelope & {
+  /** Identifies this as a control event */
   event_type: 'control';
+  /** Type of control operation */
   control_type: 'server_draining';
 };
 
@@ -51,13 +59,21 @@ export type ControlEnvelope = BaseEnvelope & {
  * @template T The type of messages received from the stream
  */
 export type ConduitClientConfig<T> = {
+  /** Organization identifier */
   orgId: number;
+  /** URL endpoint to POST for initiating a new stream */
   startStreamUrl: string;
+  /** Base URL for the stream connection */
   baseConduitUrl: string;
+  /** Additional data to include in the POST body when starting the stream */
   startStreamData?: Record<string, unknown>;
+  /** Callback fired when a new message is received */
   onMessage?: (message: T) => void;
+  /** Callback fired when stream connection opens */
   onOpen?: () => void;
+  /** Callback fired when stream connection closes */
   onClose?: () => void;
+  /** Callback fired when errors occur within a stream */
   onError?: (err: Error) => void;
 };
 
@@ -211,22 +227,31 @@ export class ConduitClient<T> {
     this.connect();
   }
 
+  private getTokenExpiry(token: string): number | undefined {
+    const split = token.split('.')[1];
+    if (split === undefined) {
+      return undefined;
+    }
+    try {
+      const payload = JSON.parse(atob(split));
+      return payload.exp ? payload.exp * 1000 : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
   async connect(): Promise<void> {
     if (this.connecting || this.eventSource) return;
     this.connecting = true;
     try {
-      const { token, channel_id, expires_in } = await this.startStream();
+      const { token, channel_id } = await this.startStream();
+
+      this.tokenExpiresAt = this.getTokenExpiry(token);
 
       if (channel_id !== this.currentChannelId) {
         this.currentChannelId = channel_id;
         this.lastSeq = undefined;
         this.seenIds.clear();
-      }
-
-      if (Number.isFinite(expires_in) && expires_in > 0) {
-        this.tokenExpiresAt = Date.now() + expires_in * 1000;
-      } else {
-        this.tokenExpiresAt = undefined;
       }
 
       const url = this.buildUrl(token, channel_id);

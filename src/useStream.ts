@@ -6,6 +6,7 @@ import { ConduitClient, type ConduitClientConfig } from './client';
  * @template T The type of messages received from the stream
  */
 export interface UseStreamOptions<T> extends ConduitClientConfig<T> {
+  /** Whether the stream is enabled */
   enabled: boolean;
 }
 
