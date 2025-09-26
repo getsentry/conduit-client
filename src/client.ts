@@ -104,7 +104,7 @@ export class ConduitClient<T> {
     }
 
     this.eventSource.onerror = () => {
-      if (this.eventSource == null) return;
+      if (this.eventSource === null) return;
       this.config.onError?.(new Error('SSE connection error'));
     };
 

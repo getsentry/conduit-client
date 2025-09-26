@@ -15,7 +15,7 @@ export function useStream<T>(config: ConduitClientConfig<T>, enabled: boolean) {
   const clearMessages = () => setMessages([]);
 
   useEffect(() => {
-    if (clientRef.current == null) {
+    if (clientRef.current === null) {
       const client = new ConduitClient<T>({
         ...config,
         onMessage: (msg: T) => {
