@@ -16,6 +16,9 @@ function App() {
     onMessage: (message: Message) => {
       setMessages((prev) => [...prev, message]);
     },
+    onOpen: () => {
+      setMessages([]);
+    },
     onClose: () => {
       setIsEnabled(false);
     },
