@@ -30,7 +30,7 @@ export default defineConfig([
       'react-hooks': pluginReactHooks,
     },
     rules: {
-      'eqeqeq': 'error',
+      eqeqeq: 'error',
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
     },

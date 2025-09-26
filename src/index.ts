@@ -1,4 +1,4 @@
-export { useStream } from './useStream';
+export { useStream, type UseStreamOptions } from './useStream';
 export {
   ConduitClient,
   type ConduitClientConfig,

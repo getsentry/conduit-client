@@ -1,44 +1,54 @@
 import { useEffect, useRef, useState } from 'react';
 import { ConduitClient, type ConduitClientConfig } from './client';
 
-export function useStream<T>(config: ConduitClientConfig<T>, enabled: boolean) {
+/**
+ * The options for configuring the stream
+ * @template T The type of messages received from the stream
+ */
+export interface UseStreamOptions<T> extends ConduitClientConfig<T> {
+  enabled: boolean;
+}
+
+/**
+ * React hook for managing streaming via Conduit with automatic lifecycle handling.
+ * @template T The type of message received from the stream
+ * @param options Options for the stream
+ * @returns Connection state: isConnected and error
+ */
+export function useStream<T>(options: UseStreamOptions<T>) {
   const clientRef = useRef<ConduitClient<T> | null>(null);
   const isConnectingRef = useRef(false);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<Error | null>(null);
-  const [messages, setMessages] = useState<T[]>([]);
 
   // Store config in a ref to always have the latest callbacks
-  const configRef = useRef(config);
-  configRef.current = config;
-
-  const clearMessages = () => setMessages([]);
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
 
   useEffect(() => {
     if (clientRef.current === null) {
       const client = new ConduitClient<T>({
-        ...config,
+        ...options,
         onMessage: (msg: T) => {
-          setMessages((prev) => [...prev, msg]);
-          configRef.current.onMessage?.(msg);
+          optionsRef.current.onMessage?.(msg);
         },
         onOpen: () => {
           setIsConnected(true);
-          configRef.current.onOpen?.();
+          optionsRef.current.onOpen?.();
         },
         onClose: () => {
           setIsConnected(false);
-          configRef.current.onClose?.();
+          optionsRef.current.onClose?.();
         },
         onError: (err: Error) => {
           setError(err);
-          configRef.current.onError?.(err);
+          optionsRef.current.onError?.(err);
         },
       });
       clientRef.current = client;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.orgId, config.startStreamUrl, config.baseConduitUrl]);
+  }, [options.orgId, options.startStreamUrl, options.baseConduitUrl]);
 
   useEffect(() => {
     return () => {
@@ -48,15 +58,14 @@ export function useStream<T>(config: ConduitClientConfig<T>, enabled: boolean) {
   }, []);
 
   useEffect(() => {
-    if (enabled) {
+    if (options.enabled) {
       if (!isConnectingRef.current && !clientRef.current?.isConnected()) {
         isConnectingRef.current = true;
-        setMessages([]);
         clientRef.current
           ?.connect()
           .catch((error) => {
             setError(error);
-            configRef.current.onError?.(error);
+            optionsRef.current.onError?.(error);
           })
           .finally(() => {
             isConnectingRef.current = false;
@@ -66,7 +75,7 @@ export function useStream<T>(config: ConduitClientConfig<T>, enabled: boolean) {
       clientRef.current?.disconnect();
       isConnectingRef.current = false;
     }
-  }, [enabled]);
+  }, [options.enabled]);
 
-  return { isConnected, error, messages, clearMessages };
+  return { isConnected, error };
 }

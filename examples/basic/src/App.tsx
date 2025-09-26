@@ -7,18 +7,20 @@ type Message = {
 };
 
 function App() {
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isEnabled, setIsEnabled] = useState(false);
-  const { isConnected, error, messages } = useStream<Message>(
-    {
-      orgId: 1,
-      startStreamUrl: 'http://localhost:8999/start-stream',
-      baseConduitUrl: 'http://localhost:8000',
-      onClose: () => {
-        setIsEnabled(false);
-      },
+  const { isConnected, error } = useStream<Message>({
+    orgId: 1,
+    startStreamUrl: 'http://localhost:8999/start-stream',
+    baseConduitUrl: 'http://localhost:8000',
+    onMessage: (message: Message) => {
+      setMessages((prev) => [...prev, message]);
     },
-    isEnabled,
-  );
+    onClose: () => {
+      setIsEnabled(false);
+    },
+    enabled: isEnabled,
+  });
 
   const fullMessage = messages.map((msg) => msg.value).join('');
 

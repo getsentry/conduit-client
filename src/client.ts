@@ -1,5 +1,9 @@
 const MAX_SEEN_TRACKING = 2048;
 
+/**
+ * Response from the stream initialization endpoint containing
+ * authentication and connection details.
+ */
 export type StartStreamResponse = {
   token: string;
   channel_id: string;
@@ -7,14 +11,26 @@ export type StartStreamResponse = {
   expires_in: number;
 };
 
-export type BaseEnvelope = {
+type BaseEnvelope = {
   event_type: 'stream' | 'control';
   message_id: string;
 };
 
-// To match the rust enums
+/**
+ * Indicates the current state of a streaming message.
+ * - PHASE_START: Stream initialization
+ * - PHASE_DELTA: Incremental data update
+ * - PHASE_END: Stream termination
+ * - PHASE_ERROR: Error occured in stream
+ *
+ * Matches rust enums in conduit.
+ */
 export type StreamPhase = 'PHASE_START' | 'PHASE_DELTA' | 'PHASE_END' | 'PHASE_ERROR';
 
+/**
+ * Message envelope for streaming data events.
+ * @template T The type of payload data
+ */
 export type StreamEnvelope<T> = BaseEnvelope & {
   event_type: 'stream';
   sequence: number;
@@ -22,11 +38,18 @@ export type StreamEnvelope<T> = BaseEnvelope & {
   payload?: T;
 };
 
+/**
+ * Control message for stream management operations.
+ */
 export type ControlEnvelope = BaseEnvelope & {
   event_type: 'control';
   control_type: 'server_draining';
 };
 
+/**
+ * Configuration options for the Conduit client.
+ * @template T The type of messages received from the stream
+ */
 export type ConduitClientConfig<T> = {
   orgId: number;
   startStreamUrl: string;
@@ -38,6 +61,22 @@ export type ConduitClientConfig<T> = {
   onError?: (err: Error) => void;
 };
 
+/**
+ * Client for managing streaming data via Conduit with automatic
+ * reconnection, deduplication, and token management.
+ * @template T The type of messages received from the stream
+ *
+ * @example
+ * ```typescript
+ * const client = new ConduitClient<MyMessage>({
+ *   orgId: 123,
+ *   startStreamUrl: 'https://api.example.com/stream/start',
+ *   baseConduitUrl: 'https://conduit.example.com',
+ *   onMessage: (msg) => console.log(msg),
+ *   onError: (err) => console.error(err),
+ * });
+ * ```
+ */
 export class ConduitClient<T> {
   private config: ConduitClientConfig<T>;
   private eventSource: EventSource | null = null;
@@ -114,7 +153,7 @@ export class ConduitClient<T> {
     if (streamEnvelope.phase === 'PHASE_ERROR') {
       this.config.onError?.(new Error('Stream error'));
     }
-  }
+  };
 
   private handleControl = (event: MessageEvent): void => {
     this.lastEventId = event.lastEventId;
@@ -131,7 +170,7 @@ export class ConduitClient<T> {
       this.disconnect();
       this.reconnect();
     }
-  }
+  };
 
   private attach(url: string) {
     if (this.tokenExpiresAt && Date.now() >= this.tokenExpiresAt) {
