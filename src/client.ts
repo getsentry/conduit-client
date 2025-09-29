@@ -270,4 +270,8 @@ export class ConduitClient<T> {
   isConnected(): boolean {
     return this.eventSource?.readyState === EventSource.OPEN;
   }
+
+  get isConnecting(): boolean {
+    return this.connecting;
+  }
 }

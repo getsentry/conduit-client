@@ -18,7 +18,6 @@ export interface UseStreamOptions<T> extends ConduitClientConfig<T> {
  */
 export function useStream<T>(options: UseStreamOptions<T>) {
   const clientRef = useRef<ConduitClient<T> | null>(null);
-  const isConnectingRef = useRef(false);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
@@ -62,21 +61,17 @@ export function useStream<T>(options: UseStreamOptions<T>) {
   useEffect(() => {
     (async () => {
       if (options.enabled) {
-        if (!isConnectingRef.current && !clientRef.current?.isConnected()) {
-          isConnectingRef.current = true;
+        if (!clientRef.current?.isConnecting && !clientRef.current?.isConnected()) {
           try {
             await clientRef.current?.connect();
           } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
             setError(err);
             optionsRef.current.onError?.(err);
-          } finally {
-            isConnectingRef.current = false;
           }
         }
       } else {
         clientRef.current?.disconnect();
-        isConnectingRef.current = false;
       }
     })();
   }, [options.enabled]);
