@@ -47,7 +47,7 @@ export function useStream<T>(options: UseStreamOptions<T>) {
           setError(err);
           optionsRef.current.onError?.(err);
         },
-        ...(options.startStreamData !== undefined && {startStreamData: options.startStreamData}),
+        ...(options.startStreamData !== undefined && { startStreamData: options.startStreamData }),
       });
       clientRef.current = client;
     }
@@ -61,23 +61,25 @@ export function useStream<T>(options: UseStreamOptions<T>) {
   }, []);
 
   useEffect(() => {
-    if (options.enabled) {
-      if (!isConnectingRef.current && !clientRef.current?.isConnected()) {
-        isConnectingRef.current = true;
-        clientRef.current
-          ?.connect()
-          .catch((error) => {
-            setError(error);
-            optionsRef.current.onError?.(error);
-          })
-          .finally(() => {
+    (async () => {
+      if (options.enabled) {
+        if (!isConnectingRef.current && !clientRef.current?.isConnected()) {
+          isConnectingRef.current = true;
+          try {
+            await clientRef.current?.connect();
+          } catch (error) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            setError(err);
+            optionsRef.current.onError?.(err);
+          } finally {
             isConnectingRef.current = false;
-          });
+          }
+        }
+      } else {
+        clientRef.current?.disconnect();
+        isConnectingRef.current = false;
       }
-    } else {
-      clientRef.current?.disconnect();
-      isConnectingRef.current = false;
-    }
+    })();
   }, [options.enabled]);
 
   return { isConnected, error };
