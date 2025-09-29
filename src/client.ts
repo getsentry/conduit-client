@@ -129,12 +129,13 @@ export class ConduitClient<T> {
   }
 
   private buildUrl(token: string, channelId: string): string {
-    const queryParams = new URLSearchParams({
-      token,
-      channel_id: channelId,
-    });
-    if (this.lastEventId) queryParams.set('last_event_id', this.lastEventId);
-    return `${this.config.baseConduitUrl.replace(/\/$/, '')}/events/${this.config.orgId}?${queryParams.toString()}`;
+    const url = new URL(`events/${this.config.orgId}`, this.config.baseConduitUrl);
+    url.searchParams.set('token', token);
+    url.searchParams.set('channel_id', channelId);
+    if (this.lastEventId) {
+      url.searchParams.set('last_event_id', this.lastEventId);
+    }
+    return url.toString();
   }
 
   private handleStream = (event: MessageEvent): void => {
