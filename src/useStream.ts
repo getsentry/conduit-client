@@ -27,38 +27,37 @@ export function useStream<T>(options: UseStreamOptions<T>) {
   optionsRef.current = options;
 
   useEffect(() => {
-    if (clientRef.current === null) {
-      const client = new ConduitClient<T>({
-        orgId: options.orgId,
-        startStreamUrl: options.startStreamUrl,
-        baseConduitUrl: options.baseConduitUrl,
-        onMessage: (msg: T) => {
-          optionsRef.current.onMessage?.(msg);
-        },
-        onOpen: () => {
-          setIsConnected(true);
-          optionsRef.current.onOpen?.();
-        },
-        onClose: () => {
-          setIsConnected(false);
-          optionsRef.current.onClose?.();
-        },
-        onError: (err: Error) => {
-          setError(err);
-          optionsRef.current.onError?.(err);
-        },
-        ...(options.startStreamData !== undefined && { startStreamData: options.startStreamData }),
-      });
-      clientRef.current = client;
-    }
-  }, [options.orgId, options.startStreamUrl, options.baseConduitUrl, options.startStreamData]);
-
-  useEffect(() => {
+    // Disconnect old client when deps change
+    clientRef.current?.disconnect();
+    // Also reset the state
+    setIsConnected(false);
+    setError(null);
+    const client = new ConduitClient<T>({
+      orgId: options.orgId,
+      startStreamUrl: options.startStreamUrl,
+      baseConduitUrl: options.baseConduitUrl,
+      onMessage: (msg: T) => {
+        optionsRef.current.onMessage?.(msg);
+      },
+      onOpen: () => {
+        setIsConnected(true);
+        optionsRef.current.onOpen?.();
+      },
+      onClose: () => {
+        setIsConnected(false);
+        optionsRef.current.onClose?.();
+      },
+      onError: (err: Error) => {
+        setError(err);
+        optionsRef.current.onError?.(err);
+      },
+      ...(options.startStreamData !== undefined && { startStreamData: options.startStreamData }),
+    });
+    clientRef.current = client;
     return () => {
-      clientRef.current?.disconnect();
-      clientRef.current = null;
+      client.disconnect();
     };
-  }, []);
+  }, [options.orgId, options.startStreamUrl, options.baseConduitUrl, options.startStreamData]);
 
   useEffect(() => {
     (async () => {
