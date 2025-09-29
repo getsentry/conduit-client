@@ -74,7 +74,7 @@ export function useStream<T>(options: UseStreamOptions<T>) {
         clientRef.current?.disconnect();
       }
     })();
-  }, [options.enabled]);
+  }, [options.enabled, options.orgId, options.startStreamUrl, options.baseConduitUrl, options.startStreamData]);
 
   return { isConnected, error };
 }
