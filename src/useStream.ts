@@ -22,14 +22,16 @@ export function useStream<T>(options: UseStreamOptions<T>) {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  // Store config in a ref to always have the latest callbacks
+  // Store options in a ref to always have the latest callbacks
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
   useEffect(() => {
     if (clientRef.current === null) {
       const client = new ConduitClient<T>({
-        ...options,
+        orgId: options.orgId,
+        startStreamUrl: options.startStreamUrl,
+        baseConduitUrl: options.baseConduitUrl,
         onMessage: (msg: T) => {
           optionsRef.current.onMessage?.(msg);
         },
@@ -45,11 +47,11 @@ export function useStream<T>(options: UseStreamOptions<T>) {
           setError(err);
           optionsRef.current.onError?.(err);
         },
+        ...(options.startStreamData !== undefined && {startStreamData: options.startStreamData}),
       });
       clientRef.current = client;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [options.orgId, options.startStreamUrl, options.baseConduitUrl]);
+  }, [options.orgId, options.startStreamUrl, options.baseConduitUrl, options.startStreamData]);
 
   useEffect(() => {
     return () => {
