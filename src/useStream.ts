@@ -31,6 +31,8 @@ export function useStream<T>(options: UseStreamOptions<T>) {
     // Also reset the state
     setIsConnected(false);
     setError(null);
+  
+    // Create a new client with the current options
     const client = new ConduitClient<T>({
       orgId: options.orgId,
       startStreamUrl: options.startStreamUrl,
@@ -53,17 +55,13 @@ export function useStream<T>(options: UseStreamOptions<T>) {
       ...(options.startStreamData !== undefined && { startStreamData: options.startStreamData }),
     });
     clientRef.current = client;
-    return () => {
-      client.disconnect();
-    };
-  }, [options.orgId, options.startStreamUrl, options.baseConduitUrl, options.startStreamData]);
 
-  useEffect(() => {
+    // Connect if enabled
     (async () => {
       if (options.enabled) {
-        if (!clientRef.current?.isConnecting && !clientRef.current?.isConnected()) {
+        if (!client.isConnecting && !client.isConnected()) {
           try {
-            await clientRef.current?.connect();
+            await client.connect();
           } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
             setError(err);
@@ -71,10 +69,20 @@ export function useStream<T>(options: UseStreamOptions<T>) {
           }
         }
       } else {
-        clientRef.current?.disconnect();
+        client.disconnect();
       }
     })();
-  }, [options.enabled, options.orgId, options.startStreamUrl, options.baseConduitUrl, options.startStreamData]);
+
+    return () => {
+      client.disconnect();
+    };
+  }, [
+    options.enabled,
+    options.orgId,
+    options.startStreamUrl,
+    options.baseConduitUrl,
+    options.startStreamData,
+  ]);
 
   return { isConnected, error };
 }
