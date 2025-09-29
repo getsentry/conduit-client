@@ -189,23 +189,11 @@ export class ConduitClient<T> {
   };
 
   private attach(url: string) {
-    if (this.tokenExpiresAt && Date.now() >= this.tokenExpiresAt) {
-      return;
-    }
-
     this.eventSource = new EventSource(url);
 
     this.eventSource.onopen = () => {
       this.config.onOpen?.();
     };
-
-    if (this.tokenExpiresAt && Date.now() >= this.tokenExpiresAt) {
-      const e: Error & { code?: string } = new Error('Token expired at reconnect');
-      e.code = 'TOKEN_EXPIRED';
-      this.config.onError?.(e);
-      this.disconnect();
-      return;
-    }
 
     this.eventSource.onerror = () => {
       if (this.eventSource === null) return;
@@ -247,6 +235,11 @@ export class ConduitClient<T> {
       const { token, channel_id } = await this.startStream();
 
       this.tokenExpiresAt = this.getTokenExpiry(token);
+
+      if (this.tokenExpiresAt && Date.now() >= this.tokenExpiresAt) {
+        this.config.onError?.(new Error('Token expired at reconnect'));
+        return;
+      }
 
       if (channel_id !== this.currentChannelId) {
         this.currentChannelId = channel_id;
