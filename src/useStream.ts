@@ -31,7 +31,7 @@ export function useStream<T>(options: UseStreamOptions<T>) {
     // Also reset the state
     setIsConnected(false);
     setError(null);
-  
+
     // Create a new client with the current options
     const client = new ConduitClient<T>({
       orgId: options.orgId,
