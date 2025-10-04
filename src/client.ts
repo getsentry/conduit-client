@@ -23,7 +23,7 @@ type BaseEnvelope = {
  * - PHASE_START: Stream initialization
  * - PHASE_DELTA: Incremental data update
  * - PHASE_END: Stream termination
- * - PHASE_ERROR: Error occured in stream
+ * - PHASE_ERROR: Error occurred in stream
  *
  * Matches rust enums in conduit.
  */
