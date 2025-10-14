@@ -1,0 +1,10 @@
+minVersion: 1.2.0
+changelog: CHANGELOG.md
+changelogPolicy: auto
+github:
+  owner: getsentry
+  repo: conduit-client
+artifactProvider:
+  name: github
+targets:
+  - name: npm
