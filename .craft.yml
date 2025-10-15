@@ -5,5 +5,9 @@ preReleaseCommand: bash scripts/craft-pre-release.sh
 github:
   owner: getsentry
   repo: conduit-client
+artifactProvider:
+  name: github
 targets:
+  - name: github
   - name: npm
+    access: public
