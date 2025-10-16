@@ -36,7 +36,6 @@ export function useStream<T>(options: UseStreamOptions<T>) {
     const client = new ConduitClient<T>({
       orgId: options.orgId,
       startStreamUrl: options.startStreamUrl,
-      baseConduitUrl: options.baseConduitUrl,
       onMessage: (msg: T) => {
         optionsRef.current.onMessage?.(msg);
       },
@@ -76,13 +75,7 @@ export function useStream<T>(options: UseStreamOptions<T>) {
     return () => {
       client.disconnect();
     };
-  }, [
-    options.enabled,
-    options.orgId,
-    options.startStreamUrl,
-    options.baseConduitUrl,
-    options.startStreamData,
-  ]);
+  }, [options.enabled, options.orgId, options.startStreamUrl, options.startStreamData]);
 
   return { isConnected, error };
 }
