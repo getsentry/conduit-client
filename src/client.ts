@@ -9,8 +9,6 @@ export type StartStreamResponse = {
   token: string;
   /** UUID4 for the stream session */
   channel_id: string;
-  /** JWT signing algorithm */
-  algorithm: 'RS256';
   /** Where the client should connect */
   url: string;
 };
