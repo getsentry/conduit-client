@@ -9,8 +9,8 @@ export type StartStreamResponse = {
   token: string;
   /** UUID4 for the stream session */
   channel_id: string;
-  /** JWT signing algorithm */
-  algorithm: 'RS256';
+  /** Where the client should connect */
+  url: string;
 };
 
 type BaseEnvelope = {
@@ -63,8 +63,6 @@ export type ConduitClientConfig<T> = {
   orgId: number;
   /** URL endpoint to POST for initiating a new stream */
   startStreamUrl: string;
-  /** Base URL for the stream connection */
-  baseConduitUrl: string;
   /** Additional data to include in the POST body when starting the stream */
   startStreamData?: Record<string, unknown>;
   /** Callback fired when a new message is received */
@@ -87,7 +85,6 @@ export type ConduitClientConfig<T> = {
  * const client = new ConduitClient<MyMessage>({
  *   orgId: 123,
  *   startStreamUrl: 'https://api.example.com/stream/start',
- *   baseConduitUrl: 'https://conduit.example.com',
  *   onMessage: (msg) => console.log(msg),
  *   onError: (err) => console.error(err),
  * });
@@ -128,14 +125,13 @@ export class ConduitClient<T> {
     return response.json();
   }
 
-  private buildUrl(token: string, channelId: string): string {
-    const url = new URL(`events/${this.config.orgId}`, this.config.baseConduitUrl);
-    url.searchParams.set('token', token);
-    url.searchParams.set('channel_id', channelId);
-    if (this.lastEventId) {
-      url.searchParams.set('last_event_id', this.lastEventId);
+  private buildUrl(url: string): string {
+    if (this.lastEventId === undefined) {
+      return url;
     }
-    return url.toString();
+    const finalUrl = new URL(url);
+    finalUrl.searchParams.set('last_event_id', this.lastEventId);
+    return finalUrl.toString();
   }
 
   private handleStream = (event: MessageEvent): void => {
@@ -233,7 +229,7 @@ export class ConduitClient<T> {
     if (this.connecting || this.eventSource) return;
     this.connecting = true;
     try {
-      const { token, channel_id } = await this.startStream();
+      const { token, channel_id, url } = await this.startStream();
 
       this.tokenExpiresAt = this.getTokenExpiry(token);
 
@@ -246,10 +242,11 @@ export class ConduitClient<T> {
         this.currentChannelId = channel_id;
         this.lastSeq = undefined;
         this.seenIds.clear();
+        this.lastEventId = undefined;
       }
 
-      const url = this.buildUrl(token, channel_id);
-      this.attach(url);
+      const conduitUrl = this.buildUrl(url);
+      this.attach(conduitUrl);
     } finally {
       this.connecting = false;
     }
