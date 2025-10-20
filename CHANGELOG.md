@@ -1,3 +1,9 @@
+## 0.2.0
+
+### Various fixes & improvements
+
+- ref(client): Move conduit url source of truth to backend (#8) by @IanWoodard
+
 ## 0.1.0
 
 ### Various fixes & improvements
