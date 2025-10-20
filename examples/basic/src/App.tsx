@@ -12,7 +12,6 @@ function App() {
   const { isConnected, error } = useStream<Message>({
     orgId: 1,
     startStreamUrl: 'http://localhost:8999/start-stream',
-    baseConduitUrl: 'http://localhost:8000',
     onMessage: (message: Message) => {
       setMessages((prev) => [...prev, message]);
     },
