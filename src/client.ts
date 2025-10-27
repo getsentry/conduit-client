@@ -5,12 +5,14 @@ const MAX_SEEN_TRACKING = 2048;
  * authentication and connection details.
  */
 export type StartStreamResponse = {
-  /** Authentication token for the stream connection */
-  token: string;
-  /** UUID4 for the stream session */
-  channel_id: string;
-  /** Where the client should connect */
-  url: string;
+  conduit: {
+    /** Authentication token for the stream connection */
+    token: string;
+    /** UUID4 for the stream session */
+    channel_id: string;
+    /** Where the client should connect */
+    url: string;
+  };
 };
 
 type BaseEnvelope = {
@@ -122,15 +124,24 @@ export class ConduitClient<T> {
       throw new Error(`Failed to start stream ${response.statusText}`);
     }
 
-    return response.json();
+    const data = await response.json();
+
+    if (!data.conduit?.token || !data.conduit?.channel_id || !data.conduit?.url) {
+      throw new Error('Invalid response from startStream endpoint');
+    }
+
+    return data as StartStreamResponse;
   }
 
-  private buildUrl(url: string): string {
-    if (this.lastEventId === undefined) {
-      return url;
-    }
+  private buildUrl(url: string, token: string, channelId: string): string {
     const finalUrl = new URL(url);
-    finalUrl.searchParams.set('last_event_id', this.lastEventId);
+    finalUrl.searchParams.set('token', token);
+    finalUrl.searchParams.set('channel_id', channelId);
+
+    if (this.lastEventId !== undefined) {
+      finalUrl.searchParams.set('last_event_id', this.lastEventId);
+    }
+
     return finalUrl.toString();
   }
 
@@ -229,7 +240,9 @@ export class ConduitClient<T> {
     if (this.connecting || this.eventSource) return;
     this.connecting = true;
     try {
-      const { token, channel_id, url } = await this.startStream();
+      const {
+        conduit: { token, channel_id, url },
+      } = await this.startStream();
 
       this.tokenExpiresAt = this.getTokenExpiry(token);
 
@@ -245,7 +258,7 @@ export class ConduitClient<T> {
         this.lastEventId = undefined;
       }
 
-      const conduitUrl = this.buildUrl(url);
+      const conduitUrl = this.buildUrl(url, token, channel_id);
       this.attach(conduitUrl);
     } finally {
       this.connecting = false;
