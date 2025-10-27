@@ -19,14 +19,14 @@ beforeEach(() => {
 });
 
 describe('buildUrl', () => {
-  it('returns url unchanged when lastEventId is undefined', () => {
+  it('returns url without lastEventId when undefined', () => {
     const client = new ConduitClient({
       orgId: 123,
       startStreamUrl: 'https://api.example.com/start',
     });
 
-    const result = client['buildUrl']('https://conduit.example.com');
-    expect(result).toBe('https://conduit.example.com');
+    const result = client['buildUrl']('https://conduit.example.com/events', 'token1', 'channel1');
+    expect(result).toBe('https://conduit.example.com/events?token=token1&channel_id=channel1');
   });
 
   it('appends last_event_id when present', () => {
@@ -36,20 +36,86 @@ describe('buildUrl', () => {
     });
 
     client['lastEventId'] = 'event-123';
-    const result = client['buildUrl']('https://conduit.example.com');
-    expect(result).toBe('https://conduit.example.com/?last_event_id=event-123');
+    const result = client['buildUrl']('https://conduit.example.com/events', 'token1', 'channel1');
+    expect(result).toBe(
+      'https://conduit.example.com/events?token=token1&channel_id=channel1&last_event_id=event-123',
+    );
   });
+});
 
-  it('preserves existing query params', () => {
+describe('startStream validation', () => {
+  it('throws error when conduit object is missing', async () => {
+    global.fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({}),
+    });
+
     const client = new ConduitClient({
       orgId: 123,
       startStreamUrl: 'https://api.example.com/start',
     });
 
-    client['lastEventId'] = 'event-123';
-    const result = client['buildUrl']('https://conduit.example.com?token=abc');
-    expect(result).toContain('token=abc');
-    expect(result).toContain('last_event_id=event-123');
+    await expect(client.connect()).rejects.toThrow('Invalid response from startStream endpoint');
+  });
+
+  it('throws error when token is missing', async () => {
+    global.fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          conduit: {
+            channel_id: 'channel1',
+            url: 'https://conduit.example.com/events',
+          },
+        }),
+    });
+
+    const client = new ConduitClient({
+      orgId: 123,
+      startStreamUrl: 'https://api.example.com/start',
+    });
+
+    await expect(client.connect()).rejects.toThrow('Invalid response from startStream endpoint');
+  });
+
+  it('throws error when channel_id is missing', async () => {
+    global.fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          conduit: {
+            token: 'token1',
+            url: 'https://conduit.example.com/events',
+          },
+        }),
+    });
+
+    const client = new ConduitClient({
+      orgId: 123,
+      startStreamUrl: 'https://api.example.com/start',
+    });
+
+    await expect(client.connect()).rejects.toThrow('Invalid response from startStream endpoint');
+  });
+
+  it('throws error when url is missing', async () => {
+    global.fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          conduit: {
+            token: 'token1',
+            channel_id: 'channel1',
+          },
+        }),
+    });
+
+    const client = new ConduitClient({
+      orgId: 123,
+      startStreamUrl: 'https://api.example.com/start',
+    });
+
+    await expect(client.connect()).rejects.toThrow('Invalid response from startStream endpoint');
   });
 });
 
@@ -61,18 +127,22 @@ describe('channel management', () => {
         ok: true,
         json: () =>
           Promise.resolve({
-            token: 'token1',
-            channel_id: 'channel-1',
-            url: 'https://conduit.example.com',
+            conduit: {
+              token: 'token1',
+              channel_id: 'channel1',
+              url: 'https://conduit.example.com/events',
+            },
           }),
       })
       .mockResolvedValueOnce({
         ok: true,
         json: () =>
           Promise.resolve({
-            token: 'token2',
-            channel_id: 'channel-1', // Same channel
-            url: 'https://conduit.example.com',
+            conduit: {
+              token: 'token2',
+              channel_id: 'channel1', // Same channel
+              url: 'https://conduit.example.com/events',
+            },
           }),
       });
 
@@ -100,18 +170,22 @@ describe('channel management', () => {
         ok: true,
         json: () =>
           Promise.resolve({
-            token: 'token1',
-            channel_id: 'channel-1',
-            url: 'https://conduit.example.com',
+            conduit: {
+              token: 'token1',
+              channel_id: 'channel1',
+              url: 'https://conduit.example.com/events',
+            },
           }),
       })
       .mockResolvedValueOnce({
         ok: true,
         json: () =>
           Promise.resolve({
-            token: 'token2',
-            channel_id: 'channel-2', // Different channel
-            url: 'https://conduit.example.com',
+            conduit: {
+              token: 'token2',
+              channel_id: 'channel2', // Different channel
+              url: 'https://conduit.example.com/events',
+            },
           }),
       });
 
@@ -137,15 +211,17 @@ describe('channel management', () => {
   });
 
   it('uses url from startStream response', async () => {
-    const serverUrl = 'https://conduit.us.example.com/events?token=xyz&channel_id=abc';
+    const serverUrl = 'https://conduit.us.example.com/events';
 
     global.fetch = vi.fn().mockResolvedValueOnce({
       ok: true,
       json: () =>
         Promise.resolve({
-          token: 'token1',
-          channel_id: 'channel-1',
-          url: serverUrl,
+          conduit: {
+            token: 'token1',
+            channel_id: 'channel1',
+            url: serverUrl,
+          },
         }),
     });
 
@@ -159,6 +235,6 @@ describe('channel management', () => {
 
     await client.connect();
 
-    expect(buildUrlSpy).toHaveBeenCalledWith(serverUrl);
+    expect(buildUrlSpy).toHaveBeenCalledWith(serverUrl, 'token1', 'channel1');
   });
 });
