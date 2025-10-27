@@ -1,3 +1,9 @@
+## 0.3.0
+
+### Various fixes & improvements
+
+- ref(client): Nest startStreamResponse data, add validation (#9) by @IanWoodard
+
 ## 0.2.0
 
 ### Various fixes & improvements
