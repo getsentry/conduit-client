@@ -1,3 +1,9 @@
+## 0.4.0
+
+### Various fixes & improvements
+
+- feat(client): Add ability to pass headers (#10) by @IanWoodard
+
 ## 0.3.0
 
 ### Various fixes & improvements
