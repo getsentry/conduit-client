@@ -52,6 +52,7 @@ export function useStream<T>(options: UseStreamOptions<T>) {
         optionsRef.current.onError?.(err);
       },
       ...(options.startStreamData !== undefined && { startStreamData: options.startStreamData }),
+      ...(options.startStreamHeaders !== undefined && { startStreamHeaders: options.startStreamHeaders }),
     });
     clientRef.current = client;
 
@@ -75,7 +76,7 @@ export function useStream<T>(options: UseStreamOptions<T>) {
     return () => {
       client.disconnect();
     };
-  }, [options.enabled, options.orgId, options.startStreamUrl, options.startStreamData]);
+  }, [options.enabled, options.orgId, options.startStreamUrl, options.startStreamData, options.startStreamHeaders]);
 
   return { isConnected, error };
 }

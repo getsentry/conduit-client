@@ -119,6 +119,142 @@ describe('startStream validation', () => {
   });
 });
 
+describe('startStream headers', () => {
+  it('includes custom headers in startStream request', async () => {
+    const fetchSpy = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          conduit: {
+            token: 'token1',
+            channel_id: 'channel1',
+            url: 'https://conduit.example.com/events',
+          },
+        }),
+    });
+    global.fetch = fetchSpy;
+
+    const client = new ConduitClient({
+      orgId: 123,
+      startStreamUrl: 'https://api.example.com/start',
+      startStreamHeaders: {
+        'X-CSRF-TOKEN': 'csrf-token-123',
+        Authorization: 'Bearer user-token',
+      },
+    });
+
+    await client.connect();
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://api.example.com/start',
+      expect.objectContaining({
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': 'csrf-token-123',
+          Authorization: 'Bearer user-token',
+        },
+      }),
+    );
+  });
+
+  it('works without custom headers', async () => {
+    const fetchSpy = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          conduit: {
+            token: 'token1',
+            channel_id: 'channel1',
+            url: 'https://conduit.example.com/events',
+          },
+        }),
+    });
+    global.fetch = fetchSpy;
+
+    const client = new ConduitClient({
+      orgId: 123,
+      startStreamUrl: 'https://api.example.com/start',
+    });
+
+    await client.connect();
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://api.example.com/start',
+      expect.objectContaining({
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }),
+    );
+  });
+
+  it('allows overriding Content-Type header', async () => {
+    const fetchSpy = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          conduit: {
+            token: 'token1',
+            channel_id: 'channel1',
+            url: 'https://conduit.example.com/events',
+          },
+        }),
+    });
+    global.fetch = fetchSpy;
+
+    const client = new ConduitClient({
+      orgId: 123,
+      startStreamUrl: 'https://api.example.com/start',
+      startStreamHeaders: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    });
+
+    await client.connect();
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://api.example.com/start',
+      expect.objectContaining({
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      }),
+    );
+  });
+
+  it('handles empty headers object', async () => {
+    const fetchSpy = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          conduit: {
+            token: 'token1',
+            channel_id: 'channel1',
+            url: 'https://conduit.example.com/events',
+          },
+        }),
+    });
+    global.fetch = fetchSpy;
+
+    const client = new ConduitClient({
+      orgId: 123,
+      startStreamUrl: 'https://api.example.com/start',
+      startStreamHeaders: {},
+    });
+
+    await client.connect();
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://api.example.com/start',
+      expect.objectContaining({
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }),
+    );
+  });
+});
+
 describe('channel management', () => {
   it('preserves lastEventId when reconnecting to the same channel', async () => {
     global.fetch = vi
