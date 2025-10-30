@@ -1,6 +1,6 @@
 {
   "name": "conduit-client",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Official Conduit SDK for Typescript",
   "repository": "git://github.com/getsentry/conduit-client.git",
   "author": "Sentry",
