@@ -67,6 +67,8 @@ export type ConduitClientConfig<T> = {
   startStreamUrl: string;
   /** Additional data to include in the POST body when starting the stream */
   startStreamData?: Record<string, unknown>;
+  /** Headser to use with the POST request for starting a new stream */
+  startStreamHeaders?: Record<string, string>;
   /** Callback fired when a new message is received */
   onMessage?: (message: T) => void;
   /** Callback fired when stream connection opens */
@@ -113,6 +115,7 @@ export class ConduitClient<T> {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...this.config.startStreamHeaders,
       },
       body: JSON.stringify({
         org_id: this.config.orgId,
