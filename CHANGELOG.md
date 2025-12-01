@@ -1,3 +1,9 @@
+## 1.0.0
+
+### Build / dependencies / internal 🔧
+
+- ref(callback): Add onReconnect callback, rename onOpen by @IanWoodard in [#11](https://github.com/getsentry/conduit-client/pull/11)
+
 ## 0.4.0
 
 ### Various fixes & improvements
