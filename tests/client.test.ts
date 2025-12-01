@@ -374,3 +374,60 @@ describe('channel management', () => {
     expect(buildUrlSpy).toHaveBeenCalledWith(serverUrl, 'token1', 'channel1');
   });
 });
+
+describe('connection callbacks', () => {
+  it('fires onConnect on first open', async () => {
+    global.fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          conduit: { token: 'token1', channel_id: 'channel1', url: 'https://example.com' },
+        }),
+    });
+
+    const onConnect = vi.fn();
+    const onReconnect = vi.fn();
+    const client = new ConduitClient({
+      orgId: 123,
+      startStreamUrl: 'https://api.example.com/start',
+      onConnect,
+      onReconnect,
+    });
+
+    await client.connect();
+    client['eventSource']?.onopen?.({} as Event);
+
+    expect(onConnect).toHaveBeenCalledOnce();
+    expect(onReconnect).not.toHaveBeenCalled();
+  });
+
+  it('fires onReconnect on subsequent opens', async () => {
+    global.fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          conduit: { token: 'token1', channel_id: 'channel1', url: 'https://example.com' },
+        }),
+    });
+
+    const onConnect = vi.fn();
+    const onReconnect = vi.fn();
+    const client = new ConduitClient({
+      orgId: 123,
+      startStreamUrl: 'https://api.example.com/start',
+      onConnect,
+      onReconnect,
+    });
+
+    await client.connect();
+    client['eventSource']?.onopen?.({} as Event);
+    client['eventSource']?.onopen?.({} as Event);
+
+    expect(onConnect).toHaveBeenCalledOnce();
+    expect(onReconnect).toHaveBeenCalledOnce();
+
+    // Firing onopen again calls onReconnect a second time
+    client['eventSource']?.onopen?.({} as Event);
+    expect(onReconnect).toHaveBeenCalledTimes(2);
+  });
+});

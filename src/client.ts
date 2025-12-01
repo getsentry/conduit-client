@@ -71,8 +71,10 @@ export type ConduitClientConfig<T> = {
   startStreamHeaders?: Record<string, string>;
   /** Callback fired when a new message is received */
   onMessage?: (message: T) => void;
-  /** Callback fired when stream connection opens */
-  onOpen?: () => void;
+  /** Callback fired when stream connection initially opens */
+  onConnect?: () => void;
+  /** Callback fired when stream reconnects */
+  onReconnect?: () => void;
   /** Callback fired when stream connection closes */
   onClose?: () => void;
   /** Callback fired when errors occur within a stream */
@@ -98,6 +100,7 @@ export class ConduitClient<T> {
   private config: ConduitClientConfig<T>;
   private eventSource: EventSource | null = null;
   private connecting = false;
+  private hasConnected = false;
 
   private lastEventId: string | undefined;
   private lastSeq: number | undefined;
@@ -201,9 +204,15 @@ export class ConduitClient<T> {
 
   private attach(url: string) {
     this.eventSource = new EventSource(url);
+    this.hasConnected = false;
 
     this.eventSource.onopen = () => {
-      this.config.onOpen?.();
+      if (this.hasConnected) {
+        this.config.onReconnect?.();
+      } else {
+        this.hasConnected = true;
+        this.config.onConnect?.();
+      }
     };
 
     this.eventSource.onerror = () => {
