@@ -15,7 +15,7 @@ function App() {
     onMessage: (message: Message) => {
       setMessages((prev) => [...prev, message]);
     },
-    onOpen: () => {
+    onConnect: () => {
       setMessages([]);
     },
     onClose: () => {

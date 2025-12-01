@@ -39,9 +39,13 @@ export function useStream<T>(options: UseStreamOptions<T>) {
       onMessage: (msg: T) => {
         optionsRef.current.onMessage?.(msg);
       },
-      onOpen: () => {
+      onConnect: () => {
         setIsConnected(true);
-        optionsRef.current.onOpen?.();
+        optionsRef.current.onConnect?.();
+      },
+      onReconnect: () => {
+        setError(null);
+        optionsRef.current.onReconnect?.();
       },
       onClose: () => {
         setIsConnected(false);
