@@ -447,8 +447,6 @@ describe('disconnect', () => {
   });
 
   it('does nothing when not connected', () => {
-    mockSuccessfulFetch();
-
     const onClose = vi.fn();
 
     const client = createClient({
