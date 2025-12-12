@@ -610,3 +610,219 @@ describe('getTokenExpiry', () => {
     expect(result).toBeUndefined();
   });
 });
+
+describe('handleStream', () => {
+  it('calls onMessage with payload for PHASE_DELTA', async () => {
+    mockSuccessfulFetch();
+
+    const onMessage = vi.fn();
+    const client = createClient({ onMessage });
+    await client.connect();
+
+    const addEventListenerMock = client['eventSource']?.addEventListener as ReturnType<
+      typeof vi.fn
+    >;
+
+    const streamHandler = addEventListenerMock.mock.calls.find((call) => call[0] === 'stream')?.[1];
+
+    streamHandler({
+      lastEventId: 'evt-1',
+      data: JSON.stringify({
+        event_type: 'stream',
+        message_id: 'msg-1',
+        sequence: 1,
+        phase: 'PHASE_DELTA',
+        payload: { foo: 'bar' },
+      }),
+    } as MessageEvent);
+
+    expect(onMessage).toHaveBeenCalledWith({ foo: 'bar' });
+  });
+
+  it('calls onError for PHASE_ERROR', async () => {
+    mockSuccessfulFetch();
+
+    const onMessage = vi.fn();
+    const onError = vi.fn();
+    const client = createClient({ onMessage, onError });
+    await client.connect();
+
+    const addEventListenerMock = client['eventSource']?.addEventListener as ReturnType<
+      typeof vi.fn
+    >;
+
+    const streamHandler = addEventListenerMock.mock.calls.find((call) => call[0] === 'stream')?.[1];
+
+    streamHandler({
+      lastEventId: 'evt-1',
+      data: JSON.stringify({
+        event_type: 'stream',
+        message_id: 'msg-1',
+        sequence: 1,
+        phase: 'PHASE_ERROR',
+      }),
+    } as MessageEvent);
+
+    expect(onMessage).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledWith(Error('Stream error'));
+  });
+
+  it('calls disconnect for PHASE_END', async () => {
+    mockSuccessfulFetch();
+
+    const onMessage = vi.fn();
+    const client = createClient({ onMessage });
+    await client.connect();
+
+    const disconnectSpy = vi.spyOn(client, 'disconnect');
+
+    const addEventListenerMock = client['eventSource']?.addEventListener as ReturnType<
+      typeof vi.fn
+    >;
+
+    const streamHandler = addEventListenerMock.mock.calls.find((call) => call[0] === 'stream')?.[1];
+
+    streamHandler({
+      lastEventId: 'evt-1',
+      data: JSON.stringify({
+        event_type: 'stream',
+        message_id: 'msg-1',
+        sequence: 1,
+        phase: 'PHASE_END',
+      }),
+    } as MessageEvent);
+
+    expect(onMessage).not.toHaveBeenCalled();
+    expect(disconnectSpy).toHaveBeenCalledOnce();
+  });
+
+  it('ignores duplicate message_id', async () => {
+    mockSuccessfulFetch();
+
+    const onMessage = vi.fn();
+    const client = createClient({ onMessage });
+    await client.connect();
+
+    const addEventListenerMock = client['eventSource']?.addEventListener as ReturnType<
+      typeof vi.fn
+    >;
+
+    const streamHandler = addEventListenerMock.mock.calls.find((call) => call[0] === 'stream')?.[1];
+
+    streamHandler({
+      lastEventId: 'evt-1',
+      data: JSON.stringify({
+        event_type: 'stream',
+        message_id: 'msg-1',
+        sequence: 1,
+        phase: 'PHASE_DELTA',
+        payload: { foo: 'bar' },
+      }),
+    } as MessageEvent);
+
+    streamHandler({
+      lastEventId: 'evt-1',
+      data: JSON.stringify({
+        event_type: 'stream',
+        message_id: 'msg-1',
+        sequence: 1,
+        phase: 'PHASE_DELTA',
+        payload: { foo: 'bar' },
+      }),
+    } as MessageEvent);
+
+    expect(onMessage).toHaveBeenCalledExactlyOnceWith({ foo: 'bar' });
+  });
+
+  it('ignores messages with sequence <= lastSeq', async () => {
+    mockSuccessfulFetch();
+
+    const onMessage = vi.fn();
+    const client = createClient({ onMessage });
+    await client.connect();
+
+    const addEventListenerMock = client['eventSource']?.addEventListener as ReturnType<
+      typeof vi.fn
+    >;
+
+    const streamHandler = addEventListenerMock.mock.calls.find((call) => call[0] === 'stream')?.[1];
+
+    streamHandler({
+      lastEventId: 'evt-1',
+      data: JSON.stringify({
+        event_type: 'stream',
+        message_id: 'msg-2',
+        sequence: 2,
+        phase: 'PHASE_DELTA',
+        payload: { value: 'two' },
+      }),
+    } as MessageEvent);
+
+    streamHandler({
+      lastEventId: 'evt-1',
+      data: JSON.stringify({
+        event_type: 'stream',
+        message_id: 'msg-1',
+        sequence: 1,
+        phase: 'PHASE_DELTA',
+        payload: { value: 'one' },
+      }),
+    } as MessageEvent);
+
+    expect(onMessage).toHaveBeenCalledExactlyOnceWith({ value: 'two' });
+  });
+
+  it('calls onError when JSON parsing fails', async () => {
+    mockSuccessfulFetch();
+
+    const onMessage = vi.fn();
+    const onError = vi.fn();
+    const client = createClient({ onMessage, onError });
+    await client.connect();
+
+    const addEventListenerMock = client['eventSource']?.addEventListener as ReturnType<
+      typeof vi.fn
+    >;
+
+    const streamHandler = addEventListenerMock.mock.calls.find((call) => call[0] === 'stream')?.[1];
+
+    streamHandler({
+      lastEventId: 'evt-1',
+      data: '',
+    } as MessageEvent);
+
+    expect(onMessage).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledExactlyOnceWith(Error('Failed to parse'));
+  });
+});
+
+describe('handleControl', () => {
+  it('server_draining triggers reconnect', async () => {
+    mockSuccessfulFetch();
+
+    const client = createClient();
+    await client.connect();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const reconnectSpy = vi.spyOn(client as any, 'reconnect').mockImplementation(() => {});
+
+    const addEventListenerMock = client['eventSource']?.addEventListener as ReturnType<
+      typeof vi.fn
+    >;
+
+    const controlHandler = addEventListenerMock.mock.calls.find(
+      (call) => call[0] === 'control',
+    )?.[1];
+
+    controlHandler({
+      lastEventId: 'evt-1',
+      data: JSON.stringify({
+        event_type: 'control',
+        message_id: 'msg-1',
+        control_type: 'server_draining',
+      }),
+    } as MessageEvent);
+
+    expect(reconnectSpy).toHaveBeenCalledOnce();
+  });
+});
