@@ -27,6 +27,18 @@ jobs:
       with:
         token: ${{ steps.token.outputs.token }}
         fetch-depth: 0
+    - name: Setup pnpm
+      uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
+
+    - name: Setup node
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      with:
+        node-version-file: 'package.json'
+        cache: pnpm
+
+    - name: Install dependencies
+      run: pnpm install
+
     - name: Prepare release
       uses: getsentry/craft@39ee616a6a58dc64797feecb145d66770492b66c # v2
       env:
