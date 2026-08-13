@@ -1,8 +1,8 @@
 export { useStream, type UseStreamOptions } from './useStream';
 export {
   ConduitClient,
+  CONDUIT_RESPONSE_HEADERS,
   type ConduitClientConfig,
-  type StartStreamResponse,
   type StreamEnvelope,
   type ControlEnvelope,
   type StreamPhase,

@@ -1,18 +1,15 @@
 const MAX_SEEN_TRACKING = 2048;
 
-/**
- * Response from the stream initialization endpoint containing
- * authentication and connection details.
- */
-export type StartStreamResponse = {
-  conduit: {
-    /** Authentication token for the stream connection */
-    token: string;
-    /** UUID4 for the stream session */
-    channel_id: string;
-    /** Where the client should connect */
-    url: string;
-  };
+export const CONDUIT_RESPONSE_HEADERS = {
+  token: 'X-Conduit-Token',
+  channelId: 'X-Conduit-Channel-Id',
+  url: 'X-Conduit-Url',
+} as const;
+
+type StreamCredentials = {
+  token: string;
+  channelId: string;
+  url: string;
 };
 
 type BaseEnvelope = {
@@ -113,7 +110,7 @@ export class ConduitClient<T> {
     this.config = config;
   }
 
-  private async startStream(): Promise<StartStreamResponse> {
+  private async startStream(): Promise<StreamCredentials> {
     const response = await fetch(this.config.startStreamUrl, {
       method: 'POST',
       headers: {
@@ -130,13 +127,15 @@ export class ConduitClient<T> {
       throw new Error(`Failed to start stream ${response.statusText}`);
     }
 
-    const data = await response.json();
+    const token = response.headers?.get(CONDUIT_RESPONSE_HEADERS.token);
+    const channelId = response.headers?.get(CONDUIT_RESPONSE_HEADERS.channelId);
+    const url = response.headers?.get(CONDUIT_RESPONSE_HEADERS.url);
 
-    if (!data.conduit?.token || !data.conduit?.channel_id || !data.conduit?.url) {
-      throw new Error('Invalid response from startStream endpoint');
+    if (!token || !channelId || !url) {
+      throw new Error('Missing Conduit response headers from startStream endpoint');
     }
 
-    return data as StartStreamResponse;
+    return { token, channelId, url };
   }
 
   private buildUrl(url: string, token: string, channelId: string): string {
@@ -252,9 +251,7 @@ export class ConduitClient<T> {
     if (this.connecting || this.eventSource) return;
     this.connecting = true;
     try {
-      const {
-        conduit: { token, channel_id, url },
-      } = await this.startStream();
+      const { token, channelId, url } = await this.startStream();
 
       this.tokenExpiresAt = this.getTokenExpiry(token);
 
@@ -263,14 +260,14 @@ export class ConduitClient<T> {
         return;
       }
 
-      if (channel_id !== this.currentChannelId) {
-        this.currentChannelId = channel_id;
+      if (channelId !== this.currentChannelId) {
+        this.currentChannelId = channelId;
         this.lastSeq = undefined;
         this.seenIds.clear();
         this.lastEventId = undefined;
       }
 
-      const conduitUrl = this.buildUrl(url, token, channel_id);
+      const conduitUrl = this.buildUrl(url, token, channelId);
       this.attach(conduitUrl);
     } finally {
       this.connecting = false;

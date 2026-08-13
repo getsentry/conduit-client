@@ -29,9 +29,21 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+const conduitHeaders = (
+  token = 'token1',
+  channelId = 'channel1',
+  url = 'https://conduit.example.com/events',
+) =>
+  new Headers({
+    'X-Conduit-Token': token,
+    'X-Conduit-Channel-Id': channelId,
+    'X-Conduit-Url': url,
+  });
+
 const mockSuccessfulFetch = (serverUrl = 'https://conduit.example.com/events', overrides = {}) => {
   global.fetch = vi.fn().mockResolvedValueOnce({
     ok: true,
+    headers: conduitHeaders('token1', 'channel1', serverUrl),
     json: () =>
       Promise.resolve({
         conduit: {
@@ -72,7 +84,26 @@ describe('buildUrl', () => {
 });
 
 describe('startStream validation', () => {
-  it('throws error when conduit object is missing', async () => {
+  it('reads connection details from response headers without parsing the body', async () => {
+    const json = vi.fn();
+    global.fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({
+        'X-Conduit-Token': 'header-token',
+        'X-Conduit-Channel-Id': 'header-channel',
+        'X-Conduit-Url': 'https://conduit.example.com/events',
+      }),
+      json,
+    });
+
+    const client = createClient();
+    await client.connect();
+
+    expect(json).not.toHaveBeenCalled();
+    expect(client['currentChannelId']).toBe('header-channel');
+  });
+
+  it('throws error when Conduit headers are missing', async () => {
     global.fetch = vi.fn().mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({}),
@@ -80,7 +111,9 @@ describe('startStream validation', () => {
 
     const client = createClient();
 
-    await expect(client.connect()).rejects.toThrow('Invalid response from startStream endpoint');
+    await expect(client.connect()).rejects.toThrow(
+      'Missing Conduit response headers from startStream endpoint',
+    );
   });
 
   it('throws error when token is missing', async () => {
@@ -97,7 +130,9 @@ describe('startStream validation', () => {
 
     const client = createClient();
 
-    await expect(client.connect()).rejects.toThrow('Invalid response from startStream endpoint');
+    await expect(client.connect()).rejects.toThrow(
+      'Missing Conduit response headers from startStream endpoint',
+    );
   });
 
   it('throws error when channel_id is missing', async () => {
@@ -114,7 +149,9 @@ describe('startStream validation', () => {
 
     const client = createClient();
 
-    await expect(client.connect()).rejects.toThrow('Invalid response from startStream endpoint');
+    await expect(client.connect()).rejects.toThrow(
+      'Missing Conduit response headers from startStream endpoint',
+    );
   });
 
   it('throws error when url is missing', async () => {
@@ -131,7 +168,9 @@ describe('startStream validation', () => {
 
     const client = createClient();
 
-    await expect(client.connect()).rejects.toThrow('Invalid response from startStream endpoint');
+    await expect(client.connect()).rejects.toThrow(
+      'Missing Conduit response headers from startStream endpoint',
+    );
   });
 });
 
@@ -139,6 +178,7 @@ describe('startStream headers', () => {
   it('includes custom headers in startStream request', async () => {
     const fetchSpy = vi.fn().mockResolvedValueOnce({
       ok: true,
+      headers: conduitHeaders(),
       json: () =>
         Promise.resolve({
           conduit: {
@@ -174,6 +214,7 @@ describe('startStream headers', () => {
   it('works without custom headers', async () => {
     const fetchSpy = vi.fn().mockResolvedValueOnce({
       ok: true,
+      headers: conduitHeaders(),
       json: () =>
         Promise.resolve({
           conduit: {
@@ -202,6 +243,7 @@ describe('startStream headers', () => {
   it('allows overriding Content-Type header', async () => {
     const fetchSpy = vi.fn().mockResolvedValueOnce({
       ok: true,
+      headers: conduitHeaders(),
       json: () =>
         Promise.resolve({
           conduit: {
@@ -234,6 +276,7 @@ describe('startStream headers', () => {
   it('handles empty headers object', async () => {
     const fetchSpy = vi.fn().mockResolvedValueOnce({
       ok: true,
+      headers: conduitHeaders(),
       json: () =>
         Promise.resolve({
           conduit: {
@@ -270,6 +313,7 @@ describe('channel management', () => {
       .fn()
       .mockResolvedValueOnce({
         ok: true,
+        headers: conduitHeaders('token1', 'channel1'),
         json: () =>
           Promise.resolve({
             conduit: {
@@ -281,6 +325,7 @@ describe('channel management', () => {
       })
       .mockResolvedValueOnce({
         ok: true,
+        headers: conduitHeaders('token2', 'channel1'),
         json: () =>
           Promise.resolve({
             conduit: {
@@ -310,6 +355,7 @@ describe('channel management', () => {
       .fn()
       .mockResolvedValueOnce({
         ok: true,
+        headers: conduitHeaders('token1', 'channel1'),
         json: () =>
           Promise.resolve({
             conduit: {
@@ -321,6 +367,7 @@ describe('channel management', () => {
       })
       .mockResolvedValueOnce({
         ok: true,
+        headers: conduitHeaders('token2', 'channel2'),
         json: () =>
           Promise.resolve({
             conduit: {
@@ -541,6 +588,7 @@ describe('isConnecting', () => {
 
     resolveFetch!({
       ok: true,
+      headers: conduitHeaders(),
       json: () =>
         Promise.resolve({
           conduit: {

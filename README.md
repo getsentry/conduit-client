@@ -41,7 +41,7 @@ See the [examples](./examples/basic) directory for complete working examples.
 | onClose            | () => void              | No       | Called when explicitly closed (disconnected)                            |
 | onError            | (error: Error) => void  | No       | Called when a stream or connection error occurs                         |
 
-The `startStreamUrl` endpoint must include `{ conduit: { token, channel_id, url } }` in its response.
+The `startStreamUrl` endpoint can return any response body. It provides the connection details in the `X-Conduit-Token`, `X-Conduit-Channel-Id`, and `X-Conduit-Url` response headers.
 
 ### useStream (React)
 
