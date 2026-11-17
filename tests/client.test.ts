@@ -468,7 +468,7 @@ describe('disconnect', () => {
 
     client.disconnect();
 
-    expect(mockEventSource?.removeEventListener).toHaveBeenCalledTimes(2); // for stream and control
+    expect(mockEventSource?.removeEventListener).toHaveBeenCalledTimes(3); // for stream, control and shutdown
   });
 });
 
@@ -824,5 +824,72 @@ describe('handleControl', () => {
     } as MessageEvent);
 
     expect(reconnectSpy).toHaveBeenCalledOnce();
+  });
+});
+
+describe('handleShutdown', () => {
+  const setup = async () => {
+    mockSuccessfulFetch();
+
+    const onError = vi.fn();
+    const onReconnect = vi.fn();
+    const onClose = vi.fn();
+    const client = createClient({ onError, onReconnect, onClose });
+    await client.connect();
+
+    const eventSource = client['eventSource'] as unknown as MockEventSource;
+    eventSource.onopen?.();
+
+    const shutdownHandler = eventSource.addEventListener.mock.calls.find(
+      (call) => call[0] === 'shutdown',
+    )?.[1];
+
+    return { client, eventSource, shutdownHandler, onError, onReconnect, onClose };
+  };
+
+  it('suppresses connection errors while the EventSource reconnects', async () => {
+    const { client, eventSource, shutdownHandler, onError, onClose } = await setup();
+
+    shutdownHandler({ data: JSON.stringify({ reason: 'server_shutdown' }) } as MessageEvent);
+    eventSource._readyState = MockEventSource.CONNECTING;
+    eventSource.onerror?.();
+    eventSource.onerror?.();
+
+    expect(onError).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(client['eventSource']).toBe(eventSource);
+  });
+
+  it('fires onReconnect and reports later errors after reconnecting', async () => {
+    const { eventSource, shutdownHandler, onError, onReconnect } = await setup();
+
+    shutdownHandler({ data: JSON.stringify({ reason: 'server_shutdown' }) } as MessageEvent);
+    eventSource._readyState = MockEventSource.CONNECTING;
+    eventSource.onerror?.();
+    eventSource.onopen?.();
+
+    expect(onReconnect).toHaveBeenCalledOnce();
+
+    eventSource.onerror?.();
+    expect(onError).toHaveBeenCalledExactlyOnceWith(Error('SSE connection error'));
+  });
+
+  it('reports the error when reconnecting fails permanently', async () => {
+    const { eventSource, shutdownHandler, onError } = await setup();
+
+    shutdownHandler({ data: JSON.stringify({ reason: 'server_shutdown' }) } as MessageEvent);
+    eventSource._readyState = MockEventSource.CLOSED;
+    eventSource.onerror?.();
+
+    expect(onError).toHaveBeenCalledExactlyOnceWith(Error('SSE connection error'));
+  });
+
+  it('does not update lastEventId', async () => {
+    const { client, shutdownHandler } = await setup();
+    client['lastEventId'] = 'evt-5';
+
+    shutdownHandler({ lastEventId: '', data: '{}' } as MessageEvent);
+
+    expect(client['lastEventId']).toBe('evt-5');
   });
 });

@@ -73,4 +73,4 @@ The `onError` callback is called for:
 
 ### Reconnection
 
-The client automatically reconnects when the underlying connection drops (e.g., network interruption). `onReconnect` fires on successful reconnection. Calling `disconnect()` stops the stream permanently until `connect()` is called again.
+The client automatically reconnects when the underlying connection drops (e.g., network interruption). `onReconnect` fires on successful reconnection. When the server shuts down (e.g., during a deploy), it sends a `shutdown` event and closes the stream. The client then reconnects after the server-provided delay and resumes from the last received event, without calling `onError` in the meantime. Calling `disconnect()` stops the stream permanently until `connect()` is called again.
