@@ -102,6 +102,8 @@ export class ConduitClient<T> {
   private connecting = false;
   private hasConnected = false;
 
+  private serverShuttingDown = false;
+
   private lastEventId: string | undefined;
   private lastSeq: number | undefined;
   private seenIds = new Set<string>();
@@ -202,11 +204,20 @@ export class ConduitClient<T> {
     }
   };
 
+  // The server sends `shutdown` and closes the stream when it stops. The
+  // EventSource then reconnects on its own after the server's `retry:` delay,
+  // resuming from Last-Event-ID, so the connection errors until then are expected.
+  private handleShutdown = (): void => {
+    this.serverShuttingDown = true;
+  };
+
   private attach(url: string) {
     this.eventSource = new EventSource(url);
     this.hasConnected = false;
+    this.serverShuttingDown = false;
 
     this.eventSource.onopen = () => {
+      this.serverShuttingDown = false;
       if (this.hasConnected) {
         this.config.onReconnect?.();
       } else {
@@ -217,11 +228,13 @@ export class ConduitClient<T> {
 
     this.eventSource.onerror = () => {
       if (this.eventSource === null) return;
+      if (this.serverShuttingDown && this.eventSource.readyState === EventSource.CONNECTING) return;
       this.config.onError?.(new Error('SSE connection error'));
     };
 
     this.eventSource.addEventListener('stream', this.handleStream);
     this.eventSource.addEventListener('control', this.handleControl);
+    this.eventSource.addEventListener('shutdown', this.handleShutdown);
   }
 
   private async reconnect(): Promise<void> {
@@ -283,6 +296,7 @@ export class ConduitClient<T> {
       this.eventSource.onerror = null;
       this.eventSource.removeEventListener('stream', this.handleStream);
       this.eventSource.removeEventListener('control', this.handleControl);
+      this.eventSource.removeEventListener('shutdown', this.handleShutdown);
       this.eventSource.close();
       this.eventSource = null;
       this.config.onClose?.();
